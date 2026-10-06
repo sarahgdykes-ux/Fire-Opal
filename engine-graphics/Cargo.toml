@@ -1,0 +1,11 @@
+[package]
+name = "engine-graphics"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+engine-core = { path = "../engine-core" }
+winit = "0.30"
+png = "0.17"
