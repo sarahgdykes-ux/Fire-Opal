@@ -307,7 +307,6 @@ name = "engine-input"
 version = "0.1.0"
 dependencies = [
  "engine-core",
- "winit",
 ]
 
 [[package]]

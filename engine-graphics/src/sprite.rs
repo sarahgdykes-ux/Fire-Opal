@@ -26,15 +26,18 @@ impl Sprite {
     }
 
     pub fn transform(&self) -> Mat3 {
+        let size = Vec2::new(self.texture.width as f32, self.texture.height as f32);
         Mat3::from_scale_translation_rotation(
-            self.scale * Vec2::new(self.texture.width as f32, self.texture.height as f32),
+            Vec2::new(self.scale.x * size.x, self.scale.y * size.y),
             self.position,
             self.rotation,
         )
     }
 
     pub fn bounds(&self) -> engine_core::Rect {
-        let half_size = Vec2::new(self.texture.width as f32, self.texture.height as f32) * self.scale * 0.5;
+        let size = Vec2::new(self.texture.width as f32, self.texture.height as f32);
+        let scaled_size = Vec2::new(self.scale.x * size.x, self.scale.y * size.y);
+        let half_size = scaled_size * 0.5;
         engine_core::Rect::from_center(self.position, half_size * 2.0)
     }
 }

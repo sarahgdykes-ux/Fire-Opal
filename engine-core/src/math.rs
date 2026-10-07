@@ -191,6 +191,17 @@ impl DivAssign<f32> for Vec2 {
     }
 }
 
+impl std::ops::Neg for Vec2 {
+    type Output = Self;
+
+    fn neg(self) -> Self {
+        Self {
+            x: -self.x,
+            y: -self.y,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Mat3 {
     pub m: [f32; 9],
@@ -300,6 +311,14 @@ impl Mat3 {
                 c * p + f * q + i * r,
             ],
         }
+    }
+}
+
+impl Mul for Mat3 {
+    type Output = Self;
+
+    fn mul(self, other: Self) -> Self {
+        self.mul(other)
     }
 }
 
@@ -432,6 +451,12 @@ impl Color {
         r: 0.0,
         g: 0.0,
         b: 1.0,
+        a: 1.0,
+    };
+    pub const YELLOW: Self = Self {
+        r: 1.0,
+        g: 1.0,
+        b: 0.0,
         a: 1.0,
     };
     pub const TRANSPARENT: Self = Self {

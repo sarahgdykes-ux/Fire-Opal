@@ -7,4 +7,3 @@ license.workspace = true
 
 [dependencies]
 engine-core = { path = "../engine-core" }
-winit = "0.30"

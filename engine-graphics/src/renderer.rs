@@ -143,7 +143,7 @@ impl Renderer {
         let mut curx1 = v2.x;
         let mut curx2 = v2.x;
 
-        for y in (v0.y as i32)..=(v2.y as i32).rev() {
+        for y in ((v0.y as i32)..=(v2.y as i32)).rev() {
             let y = y as f32;
             let start_x = curx1.min(curx2);
             let end_x = curx1.max(curx2);

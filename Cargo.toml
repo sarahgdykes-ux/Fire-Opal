@@ -5,6 +5,10 @@ members = [
     "engine-graphics",
     "engine-physics",
     "engine-input",
+    "engine-audio",
+    "engine-ui",
+    "engine",
+    "examples/platformer",
 ]
 resolver = "2"
 
