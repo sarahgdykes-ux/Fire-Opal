@@ -61,10 +61,10 @@ impl Animation {
 
         self.time_accumulated += delta;
 
-        let current_frame = &self.frames[self.current_frame];
-        
-        while self.time_accumulated >= current_frame.duration {
-            self.time_accumulated -= current_frame.duration;
+        let current_duration = self.frames[self.current_frame].duration;
+
+        while self.time_accumulated >= current_duration {
+            self.time_accumulated -= current_duration;
             self.advance_frame();
         }
     }

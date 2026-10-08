@@ -6,7 +6,7 @@ use crate::label::Label;
 use crate::panel::Panel;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct UIElementId(usize);
+pub struct UIElementId(pub usize);
 
 pub struct UIManager {
     elements: HashMap<UIElementId, UIElement>,

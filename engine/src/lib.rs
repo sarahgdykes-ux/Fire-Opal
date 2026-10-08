@@ -8,8 +8,12 @@ use winit::{
 use engine_core::Time;
 use engine_graphics::{Renderer, Camera};
 use engine_input::{Keyboard, Mouse, InputMap, KeyCode, MouseButton};
-use engine_audio::{AudioManager, SoundSettings};
+use engine_audio::AudioManager;
 use engine_ui::UIManager;
+
+// Re-export commonly used types
+pub use engine_input::InputAction;
+pub use engine_ui::{Button, Label, Panel, UIElementId, UIElementKind};
 
 pub struct Engine {
     window: Option<Window>,
@@ -156,53 +160,53 @@ impl Engine {
     }
 
     fn map_winit_key(&self, key: winit::keyboard::PhysicalKey) -> Option<KeyCode> {
-        use winit::keyboard::KeyCode as WinitKeyCode;
+        use winit::keyboard::{KeyCode as WinitKeyCode, PhysicalKey};
         match key {
-            WinitKeyCode::KeyA => Some(KeyCode::A),
-            WinitKeyCode::KeyB => Some(KeyCode::B),
-            WinitKeyCode::KeyC => Some(KeyCode::C),
-            WinitKeyCode::KeyD => Some(KeyCode::D),
-            WinitKeyCode::KeyE => Some(KeyCode::E),
-            WinitKeyCode::KeyF => Some(KeyCode::F),
-            WinitKeyCode::KeyG => Some(KeyCode::G),
-            WinitKeyCode::KeyH => Some(KeyCode::H),
-            WinitKeyCode::KeyI => Some(KeyCode::I),
-            WinitKeyCode::KeyJ => Some(KeyCode::J),
-            WinitKeyCode::KeyK => Some(KeyCode::K),
-            WinitKeyCode::KeyL => Some(KeyCode::L),
-            WinitKeyCode::KeyM => Some(KeyCode::M),
-            WinitKeyCode::KeyN => Some(KeyCode::N),
-            WinitKeyCode::KeyO => Some(KeyCode::O),
-            WinitKeyCode::KeyP => Some(KeyCode::P),
-            WinitKeyCode::KeyQ => Some(KeyCode::Q),
-            WinitKeyCode::KeyR => Some(KeyCode::R),
-            WinitKeyCode::KeyS => Some(KeyCode::S),
-            WinitKeyCode::KeyT => Some(KeyCode::T),
-            WinitKeyCode::KeyU => Some(KeyCode::U),
-            WinitKeyCode::KeyV => Some(KeyCode::V),
-            WinitKeyCode::KeyW => Some(KeyCode::W),
-            WinitKeyCode::KeyX => Some(KeyCode::X),
-            WinitKeyCode::KeyY => Some(KeyCode::Y),
-            WinitKeyCode::KeyZ => Some(KeyCode::Z),
-            WinitKeyCode::Space => Some(KeyCode::Space),
-            WinitKeyCode::Enter => Some(KeyCode::Enter),
-            WinitKeyCode::Escape => Some(KeyCode::Escape),
-            WinitKeyCode::Tab => Some(KeyCode::Tab),
-            WinitKeyCode::Backspace => Some(KeyCode::Backspace),
-            WinitKeyCode::ArrowUp => Some(KeyCode::Up),
-            WinitKeyCode::ArrowDown => Some(KeyCode::Down),
-            WinitKeyCode::ArrowLeft => Some(KeyCode::Left),
-            WinitKeyCode::ArrowRight => Some(KeyCode::Right),
-            WinitKeyCode::Digit0 => Some(KeyCode::Key0),
-            WinitKeyCode::Digit1 => Some(KeyCode::Key1),
-            WinitKeyCode::Digit2 => Some(KeyCode::Key2),
-            WinitKeyCode::Digit3 => Some(KeyCode::Key3),
-            WinitKeyCode::Digit4 => Some(KeyCode::Key4),
-            WinitKeyCode::Digit5 => Some(KeyCode::Key5),
-            WinitKeyCode::Digit6 => Some(KeyCode::Key6),
-            WinitKeyCode::Digit7 => Some(KeyCode::Key7),
-            WinitKeyCode::Digit8 => Some(KeyCode::Key8),
-            WinitKeyCode::Digit9 => Some(KeyCode::Key9),
+            PhysicalKey::Code(WinitKeyCode::KeyA) => Some(KeyCode::A),
+            PhysicalKey::Code(WinitKeyCode::KeyB) => Some(KeyCode::B),
+            PhysicalKey::Code(WinitKeyCode::KeyC) => Some(KeyCode::C),
+            PhysicalKey::Code(WinitKeyCode::KeyD) => Some(KeyCode::D),
+            PhysicalKey::Code(WinitKeyCode::KeyE) => Some(KeyCode::E),
+            PhysicalKey::Code(WinitKeyCode::KeyF) => Some(KeyCode::F),
+            PhysicalKey::Code(WinitKeyCode::KeyG) => Some(KeyCode::G),
+            PhysicalKey::Code(WinitKeyCode::KeyH) => Some(KeyCode::H),
+            PhysicalKey::Code(WinitKeyCode::KeyI) => Some(KeyCode::I),
+            PhysicalKey::Code(WinitKeyCode::KeyJ) => Some(KeyCode::J),
+            PhysicalKey::Code(WinitKeyCode::KeyK) => Some(KeyCode::K),
+            PhysicalKey::Code(WinitKeyCode::KeyL) => Some(KeyCode::L),
+            PhysicalKey::Code(WinitKeyCode::KeyM) => Some(KeyCode::M),
+            PhysicalKey::Code(WinitKeyCode::KeyN) => Some(KeyCode::N),
+            PhysicalKey::Code(WinitKeyCode::KeyO) => Some(KeyCode::O),
+            PhysicalKey::Code(WinitKeyCode::KeyP) => Some(KeyCode::P),
+            PhysicalKey::Code(WinitKeyCode::KeyQ) => Some(KeyCode::Q),
+            PhysicalKey::Code(WinitKeyCode::KeyR) => Some(KeyCode::R),
+            PhysicalKey::Code(WinitKeyCode::KeyS) => Some(KeyCode::S),
+            PhysicalKey::Code(WinitKeyCode::KeyT) => Some(KeyCode::T),
+            PhysicalKey::Code(WinitKeyCode::KeyU) => Some(KeyCode::U),
+            PhysicalKey::Code(WinitKeyCode::KeyV) => Some(KeyCode::V),
+            PhysicalKey::Code(WinitKeyCode::KeyW) => Some(KeyCode::W),
+            PhysicalKey::Code(WinitKeyCode::KeyX) => Some(KeyCode::X),
+            PhysicalKey::Code(WinitKeyCode::KeyY) => Some(KeyCode::Y),
+            PhysicalKey::Code(WinitKeyCode::KeyZ) => Some(KeyCode::Z),
+            PhysicalKey::Code(WinitKeyCode::Space) => Some(KeyCode::Space),
+            PhysicalKey::Code(WinitKeyCode::Enter) => Some(KeyCode::Enter),
+            PhysicalKey::Code(WinitKeyCode::Escape) => Some(KeyCode::Escape),
+            PhysicalKey::Code(WinitKeyCode::Tab) => Some(KeyCode::Tab),
+            PhysicalKey::Code(WinitKeyCode::Backspace) => Some(KeyCode::Backspace),
+            PhysicalKey::Code(WinitKeyCode::ArrowUp) => Some(KeyCode::Up),
+            PhysicalKey::Code(WinitKeyCode::ArrowDown) => Some(KeyCode::Down),
+            PhysicalKey::Code(WinitKeyCode::ArrowLeft) => Some(KeyCode::Left),
+            PhysicalKey::Code(WinitKeyCode::ArrowRight) => Some(KeyCode::Right),
+            PhysicalKey::Code(WinitKeyCode::Digit0) => Some(KeyCode::Key0),
+            PhysicalKey::Code(WinitKeyCode::Digit1) => Some(KeyCode::Key1),
+            PhysicalKey::Code(WinitKeyCode::Digit2) => Some(KeyCode::Key2),
+            PhysicalKey::Code(WinitKeyCode::Digit3) => Some(KeyCode::Key3),
+            PhysicalKey::Code(WinitKeyCode::Digit4) => Some(KeyCode::Key4),
+            PhysicalKey::Code(WinitKeyCode::Digit5) => Some(KeyCode::Key5),
+            PhysicalKey::Code(WinitKeyCode::Digit6) => Some(KeyCode::Key6),
+            PhysicalKey::Code(WinitKeyCode::Digit7) => Some(KeyCode::Key7),
+            PhysicalKey::Code(WinitKeyCode::Digit8) => Some(KeyCode::Key8),
+            PhysicalKey::Code(WinitKeyCode::Digit9) => Some(KeyCode::Key9),
             _ => Some(KeyCode::Unknown),
         }
     }
@@ -222,7 +226,7 @@ pub trait Game {
     fn render(&mut self, engine: &mut Engine);
 }
 
-pub fn run<T: Game + 'static>(mut game: T) {
+pub fn run<T: Game + 'static>(game: T) {
     let event_loop = EventLoop::new().unwrap();
     let mut app = EngineApp::new(game);
     event_loop.run_app(&mut app).unwrap();
@@ -271,7 +275,6 @@ impl<T: Game> ApplicationHandler for EngineApp<T> {
 
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
         self.engine.update();
-
         self.game.update(&mut self.engine);
         self.game.render(&mut self.engine);
 

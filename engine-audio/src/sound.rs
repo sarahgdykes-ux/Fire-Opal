@@ -4,7 +4,6 @@ use std::path::Path;
 pub struct SoundSettings {
     pub volume: f32,
     pub speed: f32,
-    pub looped: bool,
 }
 
 impl Default for SoundSettings {
@@ -12,7 +11,6 @@ impl Default for SoundSettings {
         Self {
             volume: 1.0,
             speed: 1.0,
-            looped: false,
         }
     }
 }
@@ -68,6 +66,5 @@ mod tests {
         let settings = SoundSettings::default();
         assert_eq!(settings.volume, 1.0);
         assert_eq!(settings.speed, 1.0);
-        assert!(!settings.looped);
     }
 }

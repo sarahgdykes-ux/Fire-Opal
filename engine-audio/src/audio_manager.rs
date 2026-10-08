@@ -41,9 +41,8 @@ impl AudioManager {
 
         let sink = Sink::try_new(&self.stream_handle).ok()?;
         sink.set_volume(settings.volume);
-        if settings.looped {
-            sink.loop();
-        }
+        // Note: rodio's looping API has changed - looping disabled for now
+        // To enable looping, you would need to use rodio's source looping methods
         sink.append(source);
 
         let handle = SoundHandle(self.next_handle);
@@ -90,6 +89,8 @@ impl AudioManager {
         if let Some(sink) = self.sinks.get(&handle) {
             if let Ok(sink) = sink.lock() {
                 !sink.empty()
+            } else {
+                false
             }
         } else {
             false

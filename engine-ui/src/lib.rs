@@ -8,4 +8,4 @@ pub use element::{UIElement, UIElementKind};
 pub use button::Button;
 pub use label::Label;
 pub use panel::Panel;
-pub use ui_manager::UIManager;
+pub use ui_manager::{UIManager, UIElementId};

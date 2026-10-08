@@ -1,4 +1,4 @@
-use engine_core::{Vec2, Rect, Color};
+use engine_core::{Rect, Color};
 use crate::element::{UIElement, UIElementKind};
 
 #[derive(Debug, Clone)]

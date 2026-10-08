@@ -1,13 +1,12 @@
-use engine::{Game, Engine};
+use engine::{Game, Engine, InputAction, Button, Label, Panel, UIElementId, UIElementKind};
 use engine_core::{Color, Vec2, Rect};
-use engine_ui::{Button, Label, Panel};
 
 struct PlatformerGame {
     player_pos: (f32, f32),
     player_velocity: (f32, f32),
-    jump_button_id: Option<engine_ui::UIElementId>,
+    jump_button_id: Option<UIElementId>,
     score: i32,
-    score_label_id: Option<engine_ui::UIElementId>,
+    score_label_id: Option<UIElementId>,
 }
 
 impl PlatformerGame {
@@ -60,17 +59,17 @@ impl Game for PlatformerGame {
         let gravity = 800.0;
 
         // Keyboard movement
-        if input_map.is_action_pressed(engine_input::InputAction::MoveLeft, keyboard, engine.mouse()) {
+        if input_map.is_action_pressed(InputAction::MoveLeft, keyboard, engine.mouse()) {
             self.player_velocity.0 = -move_speed;
-        } else if input_map.is_action_pressed(engine_input::InputAction::MoveRight, keyboard, engine.mouse()) {
+        } else if input_map.is_action_pressed(InputAction::MoveRight, keyboard, engine.mouse()) {
             self.player_velocity.0 = move_speed;
         } else {
             self.player_velocity.0 = 0.0;
         }
 
         // Jump via keyboard or UI button
-        let jump_triggered = input_map.is_action_just_pressed(engine_input::InputAction::Jump, keyboard, engine.mouse())
-            || engine.ui().is_button_clicked(self.jump_button_id.unwrap());
+        let jump_triggered = input_map.is_action_just_pressed(InputAction::Jump, keyboard, engine.mouse())
+            || engine.ui().is_button_clicked(self.jump_button_id.unwrap_or(UIElementId(0)));
 
         if jump_triggered {
             self.player_velocity.1 = jump_force;
@@ -100,6 +99,23 @@ impl Game for PlatformerGame {
     }
 
     fn render(&mut self, engine: &mut Engine) {
+        // Collect UI element data before borrowing renderer
+        let ui = engine.ui();
+        let ui_draw_data: Vec<_> = ui.get_visible_elements()
+            .into_iter()
+            .map(|(id, element)| {
+                let draw_data = if let Some(button) = ui.get_button(id) {
+                    Some((element.bounds, button.get_current_color(), element.kind))
+                } else if ui.get_label(id).is_some() {
+                    Some((element.bounds, Color::BLUE, element.kind))
+                } else {
+                    Some((element.bounds, element.background_color, element.kind))
+                };
+                draw_data
+            })
+            .filter_map(|x| x)
+            .collect();
+
         if let Some(renderer) = engine.renderer_mut() {
             renderer.clear();
 
@@ -118,16 +134,8 @@ impl Game for PlatformerGame {
             renderer.fill_rect(floor_rect, Color::GREEN);
 
             // Draw UI elements
-            let ui = engine.ui();
-            for (id, element) in ui.get_visible_elements() {
-                if let Some(button) = ui.get_button(id) {
-                    renderer.fill_rect(element.bounds, button.get_current_color());
-                } else if let Some(label) = ui.get_label(id) {
-                    // For now, just draw a placeholder for text
-                    renderer.fill_rect(element.bounds, Color::BLUE);
-                } else if element.kind == engine_ui::UIElementKind::Panel {
-                    renderer.fill_rect(element.bounds, element.background_color);
-                }
+            for (bounds, color, kind) in ui_draw_data {
+                renderer.fill_rect(bounds, color);
             }
         }
     }
