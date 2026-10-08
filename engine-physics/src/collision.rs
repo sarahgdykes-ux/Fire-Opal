@@ -87,18 +87,23 @@ pub fn resolve_collision(
 
     let move_per_inv_mass = collision.penetration / total_inverse_mass;
 
+    // `collision.normal` points from body_b toward body_a (see detect_aabb_collision:
+    // it is derived from `center_a - center_b`). To separate the bodies, body_a must
+    // move further along the normal and body_b must move further against it.
     if body_a.body_type != crate::body::BodyType::Static {
-        body_a.position -= collision.normal * (move_per_inv_mass * body_a.inverse_mass);
+        body_a.position += collision.normal * (move_per_inv_mass * body_a.inverse_mass);
     }
 
     if body_b.body_type != crate::body::BodyType::Static {
-        body_b.position += collision.normal * (move_per_inv_mass * body_b.inverse_mass);
+        body_b.position -= collision.normal * (move_per_inv_mass * body_b.inverse_mass);
     }
 
     let relative_velocity = body_b.velocity - body_a.velocity;
     let velocity_along_normal = relative_velocity.dot(collision.normal);
 
-    if velocity_along_normal > 0.0 {
+    // If the relative velocity along the normal is already positive, the bodies are
+    // separating (moving apart) and no impulse should be applied.
+    if velocity_along_normal < 0.0 {
         return;
     }
 

@@ -1,4 +1,4 @@
-use engine::{Game, Engine, InputAction, Button, Label, Panel, UIElementId, UIElementKind};
+use engine::{Game, Engine, InputAction, Button, Label, Panel, UIElementId};
 use engine_core::{Color, Vec2, Rect};
 
 struct PlatformerGame {
@@ -134,7 +134,7 @@ impl Game for PlatformerGame {
             renderer.fill_rect(floor_rect, Color::GREEN);
 
             // Draw UI elements
-            for (bounds, color, kind) in ui_draw_data {
+            for (bounds, color, _kind) in ui_draw_data {
                 renderer.fill_rect(bounds, color);
             }
         }

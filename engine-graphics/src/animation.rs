@@ -70,30 +70,34 @@ impl Animation {
     }
 
     fn advance_frame(&mut self) {
-        let next_frame = (self.current_frame as i32 + self.direction) as usize;
+        // Compute the next frame index in i32 first so a backwards step from frame 0
+        // (which would underflow as usize) can be detected via a negative value
+        // instead of silently wrapping to usize::MAX.
+        let next_frame_signed = self.current_frame as i32 + self.direction;
 
         match self.play_mode {
             AnimationPlayMode::Once => {
-                if next_frame >= self.frames.len() {
+                if next_frame_signed < 0 || next_frame_signed as usize >= self.frames.len() {
                     self.current_frame = self.frames.len() - 1;
                     self.is_finished = true;
                     self.is_playing = false;
                 } else {
-                    self.current_frame = next_frame;
+                    self.current_frame = next_frame_signed as usize;
                 }
             }
             AnimationPlayMode::Loop => {
-                self.current_frame = next_frame % self.frames.len();
+                let len = self.frames.len() as i32;
+                self.current_frame = (((next_frame_signed % len) + len) % len) as usize;
             }
             AnimationPlayMode::PingPong => {
-                if next_frame >= self.frames.len() {
+                if next_frame_signed >= self.frames.len() as i32 {
                     self.direction = -1;
                     self.current_frame = self.frames.len() - 1;
-                } else if self.direction == -1 && self.current_frame == 0 {
+                } else if next_frame_signed < 0 {
                     self.direction = 1;
                     self.current_frame = 0;
                 } else {
-                    self.current_frame = next_frame;
+                    self.current_frame = next_frame_signed as usize;
                 }
             }
         }

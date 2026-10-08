@@ -14,6 +14,7 @@ pub struct UIManager {
     labels: HashMap<UIElementId, Label>,
     panels: HashMap<UIElementId, Panel>,
     next_id: usize,
+    mouse_pressed: bool,
     mouse_was_pressed: bool,
 }
 
@@ -25,6 +26,7 @@ impl UIManager {
             labels: HashMap::new(),
             panels: HashMap::new(),
             next_id: 0,
+            mouse_pressed: false,
             mouse_was_pressed: false,
         }
     }
@@ -77,16 +79,22 @@ impl UIManager {
     }
 
     pub fn update(&mut self, mouse_pos: Vec2, mouse_pressed: bool) {
+        // Remember last frame's pressed state *before* overwriting it, so
+        // `is_button_clicked` can detect the pressed/not-pressed edge correctly.
+        self.mouse_was_pressed = self.mouse_pressed;
+        self.mouse_pressed = mouse_pressed;
+
         for button in self.buttons.values_mut() {
             button.update(mouse_pos, mouse_pressed);
         }
-
-        self.mouse_was_pressed = mouse_pressed;
     }
 
     pub fn is_button_clicked(&self, id: UIElementId) -> bool {
         if let Some(button) = self.buttons.get(&id) {
-            button.is_just_clicked(button.is_clicked, self.mouse_was_pressed)
+            // Use the raw current mouse-pressed state (not `button.is_clicked`, which
+            // is already gated on hover) so the edge detection in `is_just_clicked`
+            // works correctly.
+            button.is_just_clicked(self.mouse_pressed, self.mouse_was_pressed)
         } else {
             false
         }

@@ -31,6 +31,7 @@ impl Label {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use engine_core::Vec2;
 
     #[test]
     fn test_label_creation() {

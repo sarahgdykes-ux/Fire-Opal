@@ -91,6 +91,13 @@ impl EntityPool {
         self.generations[id as usize] == entity.generation()
     }
 
+    /// Returns the current live `Entity` for a given id (i.e. with its correct,
+    /// up-to-date generation), or `None` if the id has never been allocated.
+    pub fn entity_for_id(&self, id: u32) -> Option<Entity> {
+        let generation = *self.generations.get(id as usize)?;
+        Some(Entity::new(id, generation))
+    }
+
     pub fn len(&self) -> usize {
         self.next_id as usize - self.free_list.len()
     }

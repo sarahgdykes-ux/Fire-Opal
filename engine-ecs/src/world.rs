@@ -54,11 +54,22 @@ impl World {
     }
 
     pub fn iter_components<T: crate::component::Component>(&self) -> impl Iterator<Item = (Entity, &T)> {
-        self.components.iter()
+        // `ComponentStorage` only knows raw slot ids, not generations, so its
+        // entities always carry generation 1. Re-resolve each entity against the
+        // live `EntityPool` here so callers get the real, currently-valid `Entity`
+        // (important once entity ids have been recycled).
+        self.components.iter().map(move |(entity, component)| {
+            let live_entity = self.entities.entity_for_id(entity.id()).unwrap_or(entity);
+            (live_entity, component)
+        })
     }
 
     pub fn iter_components_mut<T: crate::component::Component>(&mut self) -> impl Iterator<Item = (Entity, &mut T)> {
-        self.components.iter_mut()
+        let entities = &self.entities;
+        self.components.iter_mut().map(move |(entity, component)| {
+            let live_entity = entities.entity_for_id(entity.id()).unwrap_or(entity);
+            (live_entity, component)
+        })
     }
 
     pub fn register_system<T: System + 'static>(&mut self, system: T) {
