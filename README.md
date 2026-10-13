@@ -19,7 +19,7 @@ The engine is built with a modular crate structure:
 
 ### Core Systems
 - **ECS Architecture**: Flexible entity-component-system for game object composition
-- **Software Rasterizer**: CPU-based rendering with pixel/line/triangle drawing
+- **Software Rasterizer**: CPU-based rendering with pixel/line/triangle drawing to in-memory framebuffer
 - **Physics Engine**: AABB collision detection, impulse-based resolution, spatial partitioning
 - **Input System**: Keyboard, mouse, and action mapping with deadzone support
 - **Camera System**: 2D camera with position, zoom, rotation, and world-to-screen transforms
@@ -28,12 +28,14 @@ The engine is built with a modular crate structure:
 - **Animation System**: Frame-based animations with play modes (once, loop, ping-pong)
 
 ### Graphics
-- Pixel-perfect rendering
+- Software rasterizer rendering to in-memory framebuffer
 - Texture loading (PNG)
 - Sprite batching with z-ordering
 - View culling
 - Frame-based animations
 - Animation play modes (Once, Loop, PingPong)
+
+**Note**: The software rasterizer draws to an in-memory framebuffer. For actual display to the window, you would need to integrate with a GPU library like wgpu or a software display library like softbuffer. The current implementation focuses on the rendering logic itself.
 
 ### Physics
 - Static, dynamic, and kinematic bodies
@@ -50,7 +52,6 @@ The engine is built with a modular crate structure:
 ### Audio
 - Sound loading (WAV support via rodio)
 - Sound playback with volume and speed control
-- Looping support
 - Multiple simultaneous sounds
 - Sound management (play, pause, stop, cleanup)
 
@@ -74,6 +75,16 @@ cargo test
 cargo run --package platformer
 ```
 
+## Important Note on Display
+
+The current implementation uses a software rasterizer that renders to an in-memory framebuffer. To actually display the rendered image to the window, you would need to:
+
+1. **Use wgpu** (recommended for production): Integrate with WebGPU for hardware-accelerated rendering
+2. **Use softbuffer**: A software display library that can blit the framebuffer to the window
+3. **Platform-specific code**: Write platform-specific code to blit the framebuffer (e.g., using Windows GDI, X11, or Metal)
+
+The rendering logic itself is complete and tested - the display integration is the next step for production use.
+
 ## Example Game
 
 A simple platformer example is included in `examples/platformer`. It demonstrates:
@@ -84,6 +95,8 @@ A simple platformer example is included in `examples/platformer`. It demonstrate
 - UI system with score display and jump button
 - Audio integration (placeholder for sound effects)
 
+The example window will open and run the game loop (you'll see the FPS counter in the window title), but the screen will be white because the framebuffer isn't being displayed to the window yet.
+
 ## Design Philosophy
 
 - **From-scratch implementation**: Core engine logic built from first principles for learning
@@ -93,6 +106,7 @@ A simple platformer example is included in `examples/platformer`. It demonstrate
 
 ## Future Enhancements
 
+- **Display Integration**: Add wgpu or softbuffer for actual framebuffer display
 - Hardware-accelerated rendering (wgpu migration)
 - More physics features (rotation, polygons, continuous collision detection)
 - Scene management

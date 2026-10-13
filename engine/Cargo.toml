@@ -14,3 +14,4 @@ engine-input = { path = "../engine-input" }
 engine-audio = { path = "../engine-audio" }
 engine-ui = { path = "../engine-ui" }
 winit = "0.30"
+softbuffer = "0.4"

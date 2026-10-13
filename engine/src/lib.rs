@@ -6,10 +6,11 @@ use winit::{
 };
 
 use engine_core::Time;
-use engine_graphics::{Renderer, Camera};
+use engine_graphics::{Renderer, Camera, Color};
 use engine_input::{Keyboard, Mouse, InputMap, KeyCode, MouseButton};
 use engine_audio::AudioManager;
 use engine_ui::UIManager;
+use std::rc::Rc;
 
 // Re-export commonly used types
 pub use engine_input::InputAction;
@@ -60,6 +61,12 @@ impl Engine {
         self.renderer.as_mut()
     }
 
+    pub fn present(&mut self) {
+        // The software rasterizer renders to memory
+        // For display, you would need to integrate with softbuffer or wgpu
+        // This is a placeholder for display integration
+    }
+
     pub fn keyboard(&self) -> &Keyboard {
         &self.keyboard
     }
@@ -90,6 +97,10 @@ impl Engine {
 
     pub fn fps(&self) -> f32 {
         self.time.fps()
+    }
+
+    pub fn frame_count(&self) -> u64 {
+        self.time.frame_count()
     }
 
     pub fn stop(&mut self) {
@@ -227,8 +238,20 @@ pub trait Game {
 }
 
 pub fn run<T: Game + 'static>(game: T) {
-    let event_loop = EventLoop::new().unwrap();
-    let mut app = EngineApp::new(game);
+    let runtime = pollster::Executor::new().unwrap();
+    let (window, event_loop) = runtime.block_on(async {
+        let event_loop = EventLoop::new().unwrap();
+        let window_attributes = Window::default_attributes()
+            .with_title("Fire Opal Engine")
+            .with_inner_size(winit::dpi::PhysicalSize::new(800, 600));
+
+        let window = event_loop.create_window(window_attributes).unwrap();
+        let gpu_renderer = engine_graphics::GPURenderer::new(&window).await.ok();
+
+        Ok((window, event_loop, gpu_renderer))
+    }).unwrap();
+
+    let mut app = EngineApp::new(game, window, gpu_renderer);
     event_loop.run_app(&mut app).unwrap();
 }
 
@@ -238,26 +261,20 @@ struct EngineApp<T: Game> {
 }
 
 impl<T: Game> EngineApp<T> {
-    fn new(game: T) -> Self {
+    fn new(game: T, window: Window, gpu_renderer: Option<engine_graphics::GPURenderer>) -> Self {
+        let mut engine = Engine::new(800, 600);
+        engine.window = Some(window);
+        engine.gpu_renderer = gpu_renderer;
         Self {
             game,
-            engine: Engine::new(800, 600),
+            engine,
         }
     }
 }
 
 impl<T: Game> ApplicationHandler for EngineApp<T> {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let window_attributes = Window::default_attributes()
-            .with_title("Fire Opal Engine")
-            .with_inner_size(winit::dpi::PhysicalSize::new(800, 600));
-
-        self.engine.window = Some(event_loop.create_window(window_attributes).unwrap());
-
-        if let Some(window) = &self.engine.window {
-            let size = window.inner_size();
-            self.engine.renderer = Some(Renderer::new(size.width, size.height));
-        }
+    fn resumed(&mut self, _event_loop: &ActiveEventLoop) {
+        // Window already created
     }
 
     fn window_event(
@@ -277,8 +294,11 @@ impl<T: Game> ApplicationHandler for EngineApp<T> {
         self.engine.update();
         self.game.update(&mut self.engine);
         self.game.render(&mut self.engine);
+        self.engine.present();
 
+        // Update window title
         if let Some(window) = &self.engine.window {
+            window.set_title(&format!("Fire Opal Engine - FPS: {:.0}", self.engine.fps()));
             window.request_redraw();
         }
     }
