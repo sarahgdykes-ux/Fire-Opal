@@ -11,7 +11,7 @@ The engine is built with a modular crate structure:
 - **engine-graphics**: Software rasterizer, sprite system, camera system, texture loading (PNG support), and animation system
 - **engine-physics**: Rigid body dynamics, AABB colliders, collision detection/resolution, and spatial hash broadphase
 - **engine-input**: Keyboard, mouse, and input mapping system
-- **engine-audio**: Sound loading and playback using rodio
+- **engine-audio**: Sound loading and playback using rodio (temporarily disabled due to build issues)
 - **engine-ui**: UI elements (buttons, labels, panels) with layout and interaction
 - **engine**: Main engine loop with winit window integration
 
@@ -23,7 +23,6 @@ The engine is built with a modular crate structure:
 - **Physics Engine**: AABB collision detection, impulse-based resolution, spatial partitioning
 - **Input System**: Keyboard, mouse, and action mapping with deadzone support
 - **Camera System**: 2D camera with position, zoom, rotation, and world-to-screen transforms
-- **Audio System**: Sound loading, playback, volume control, and looping
 - **UI System**: Buttons, labels, panels with hover/click states and z-ordering
 - **Animation System**: Frame-based animations with play modes (once, loop, ping-pong)
 
@@ -35,7 +34,7 @@ The engine is built with a modular crate structure:
 - Frame-based animations
 - Animation play modes (Once, Loop, PingPong)
 
-**Note**: The software rasterizer draws to an in-memory framebuffer. For actual display to the window, you would need to integrate with a GPU library like wgpu or a software display library like softbuffer. The current implementation focuses on the rendering logic itself.
+**Note**: The software rasterizer draws to an in-memory framebuffer. The rendering logic is complete and tested, but display integration to the window needs to be added (see below).
 
 ### Physics
 - Static, dynamic, and kinematic bodies
@@ -48,12 +47,6 @@ The engine is built with a modular crate structure:
 - Mouse tracking (position, buttons, scroll)
 - Action mapping (keys/buttons to game actions)
 - Axis mapping (WASD to movement vectors)
-
-### Audio
-- Sound loading (WAV support via rodio)
-- Sound playback with volume and speed control
-- Multiple simultaneous sounds
-- Sound management (play, pause, stop, cleanup)
 
 ### UI
 - UI elements: Panels, Buttons, Labels
@@ -75,15 +68,31 @@ cargo test
 cargo run --package platformer
 ```
 
-## Important Note on Display
+**Note**: If you encounter Windows file lock errors during build, try:
+```bash
+cargo clean
+cargo build --package platformer --jobs 1
+```
 
-The current implementation uses a software rasterizer that renders to an in-memory framebuffer. To actually display the rendered image to the window, you would need to:
+## Current Status
 
-1. **Use wgpu** (recommended for production): Integrate with WebGPU for hardware-accelerated rendering
-2. **Use softbuffer**: A software display library that can blit the framebuffer to the window
-3. **Platform-specific code**: Write platform-specific code to blit the framebuffer (e.g., using Windows GDI, X11, or Metal)
+The engine is functionally complete with:
+- ✅ Full ECS system
+- ✅ Software rasterizer (renders to memory)
+- ✅ Physics engine with collision
+- ✅ Input system (keyboard, mouse, action mapping)
+- ✅ UI system (buttons, labels, panels)
+- ✅ Animation system
+- ✅ Main game loop with winit
 
-The rendering logic itself is complete and tested - the display integration is the next step for production use.
+**What's missing for display:**
+The software rasterizer renders to an in-memory framebuffer but doesn't display it to the window yet. To add display, you would need to integrate with:
+
+1. **wgpu** (recommended for production): Hardware-accelerated rendering
+2. **softbuffer**: Software display library to blit framebuffer to window
+3. **Platform-specific code**: Windows GDI, Linux X11, macOS Metal
+
+The rendering logic itself is complete - only the display integration remains.
 
 ## Example Game
 
@@ -93,9 +102,63 @@ A simple platformer example is included in `examples/platformer`. It demonstrate
 - Gravity and floor collision
 - Camera following the player
 - UI system with score display and jump button
-- Audio integration (placeholder for sound effects)
 
 The example window will open and run the game loop (you'll see the FPS counter in the window title), but the screen will be white because the framebuffer isn't being displayed to the window yet.
+
+## Adding Display Integration
+
+To add display to the window, modify `engine/src/lib.rs`:
+
+### Option 1: Using softbuffer (recommended for software rendering)
+
+1. Add to `engine/Cargo.toml`:
+```toml
+[dependencies]
+softbuffer = "0.4"
+```
+
+2. Modify `Engine` struct to include:
+```rust
+pub struct Engine {
+    window: Option<Window>,
+    renderer: Option<Renderer>,
+    surface: Option<softbuffer::Surface<softbuffer::Context<Window>, Window>>,
+    context: Option<softbuffer::Context<Window>>,
+    // ... other fields
+}
+```
+
+3. Initialize in `resumed()`:
+```rust
+let context = softbuffer::Context::new(window.clone()).unwrap();
+let surface = context.new_surface(
+    window.inner_size().width,
+    window.inner_size().height,
+).unwrap();
+self.engine.context = Some(context);
+self.engine.surface = Some(surface);
+```
+
+4. Update `present()` to copy framebuffer:
+```rust
+pub fn present(&mut self) {
+    if let (Some(surface), Some(renderer)) = (&mut self.surface, &self.renderer) {
+        let framebuffer = renderer.framebuffer();
+        let mut buffer = surface.buffer_mut().unwrap();
+        
+        for (i, pixel) in framebuffer.data.iter().enumerate() {
+            let rgba = pixel.to_rgba_u8();
+            buffer[i] = ((rgba.3 as u32) << 24) | ((rgba.0 as u32) << 16) | ((rgba.1 as u32) << 8) | (rgba.2 as u32);
+        }
+        
+        buffer.present().unwrap();
+    }
+}
+```
+
+### Option 2: Using wgpu (recommended for production)
+
+Follow the wgpu documentation to create a render pipeline and texture upload from the framebuffer data.
 
 ## Design Philosophy
 
@@ -107,6 +170,7 @@ The example window will open and run the game loop (you'll see the FPS counter i
 ## Future Enhancements
 
 - **Display Integration**: Add wgpu or softbuffer for actual framebuffer display
+- Re-enable audio system (currently disabled due to Windows build issues)
 - Hardware-accelerated rendering (wgpu migration)
 - More physics features (rotation, polygons, continuous collision detection)
 - Scene management

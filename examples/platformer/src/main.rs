@@ -1,6 +1,5 @@
 use engine::{Game, Engine, InputAction, Button, Label, Panel, UIElementId};
 use engine_core::{Color, Vec2, Rect};
-use engine_graphics::Color as GColor;
 
 struct PlatformerGame {
     player_pos: (f32, f32),
@@ -100,11 +99,45 @@ impl Game for PlatformerGame {
     }
 
     fn render(&mut self, engine: &mut Engine) {
-        engine.set_clear_color(Color::new(0.1, 0.1, 0.2, 1.0));
-        
-        // For now, just clear the screen with a dark blue background
-        // The GPU renderer will display this to the window
-        // Full rendering implementation would add dynamic vertex buffers for sprites/rects
+        // Collect UI element data before borrowing renderer
+        let ui = engine.ui();
+        let ui_draw_data: Vec<_> = ui.get_visible_elements()
+            .into_iter()
+            .map(|(id, element)| {
+                let draw_data = if let Some(button) = ui.get_button(id) {
+                    Some((element.bounds, button.get_current_color(), element.kind))
+                } else if ui.get_label(id).is_some() {
+                    Some((element.bounds, Color::BLUE, element.kind))
+                } else {
+                    Some((element.bounds, element.background_color, element.kind))
+                };
+                draw_data
+            })
+            .filter_map(|x| x)
+            .collect();
+
+        if let Some(renderer) = engine.renderer_mut() {
+            renderer.clear();
+
+            // Draw player
+            let player_rect = Rect::from_min_size(
+                Vec2::new(self.player_pos.0 - 20.0, self.player_pos.1 - 20.0),
+                Vec2::new(40.0, 40.0),
+            );
+            renderer.fill_rect(player_rect, Color::RED);
+
+            // Draw floor
+            let floor_rect = Rect::from_min_size(
+                Vec2::new(0.0, 550.0),
+                Vec2::new(2000.0, 50.0),
+            );
+            renderer.fill_rect(floor_rect, Color::GREEN);
+
+            // Draw UI elements
+            for (bounds, color, _kind) in ui_draw_data {
+                renderer.fill_rect(bounds, color);
+            }
+        }
     }
 }
 
