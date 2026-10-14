@@ -1,0 +1,3 @@
+warning: engine-graphics\Cargo.toml: unused manifest key: package.wgpu
+warning: `engine-graphics` (manifest) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.27s
