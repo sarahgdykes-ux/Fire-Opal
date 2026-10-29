@@ -1,11 +1,11 @@
 [workspace]
+# engine-audio is excluded until it is re-enabled (rodio build issues)
 members = [
     "engine-core",
     "engine-ecs",
     "engine-graphics",
     "engine-physics",
     "engine-input",
-    "engine-audio",
     "engine-ui",
     "engine",
     "examples/platformer",

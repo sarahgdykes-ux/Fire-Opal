@@ -108,8 +108,11 @@ pub fn resolve_collision(
     }
 
     let restitution = body_a.restitution.min(body_b.restitution);
+    // Signed normal impulse (negative while the bodies are approaching).
     let j = -(1.0 + restitution) * velocity_along_normal;
     let j = j / total_inverse_mass;
+    // Magnitude, used for the Coulomb friction clamp below.
+    let j_mag = j.abs();
 
     let impulse = collision.normal * j;
 
@@ -133,10 +136,10 @@ pub fn resolve_collision(
 
     let friction = body_a.friction.min(body_b.friction);
 
-    let friction_impulse = if jt.abs() < j * friction {
+    let friction_impulse = if jt.abs() < j_mag * friction {
         tangent * jt
     } else {
-        tangent * (-j * friction)
+        tangent * (-j_mag * friction)
     };
 
     if body_a.body_type == crate::body::BodyType::Dynamic {
@@ -175,6 +178,25 @@ mod tests {
 
         let collision = detect_aabb_collision(&body_a, &collider_a, &body_b, &collider_b);
         assert!(!collision.has_collision);
+    }
+
+    #[test]
+    fn test_friction_slows_sliding_body() {
+        let mut a = RigidBody::new(BodyType::Dynamic)
+            .with_position(Vec2::new(0.0, 9.0))
+            .with_velocity(Vec2::new(10.0, 5.0));
+        let mut b = RigidBody::new(BodyType::Static).with_position(Vec2::new(0.0, 18.0));
+        a.friction = 0.5;
+        b.friction = 0.5;
+        let ca = Collider::new(Vec2::new(10.0, 10.0));
+        let cb = Collider::new(Vec2::new(100.0, 10.0));
+
+        let collision = detect_aabb_collision(&a, &ca, &b, &cb);
+        assert!(collision.has_collision);
+        resolve_collision(&mut a, &mut b, &collision);
+
+        assert!(a.velocity.x < 10.0, "friction must not speed the body up");
+        assert!(a.velocity.x >= 0.0, "friction must not reverse the body");
     }
 
     #[test]

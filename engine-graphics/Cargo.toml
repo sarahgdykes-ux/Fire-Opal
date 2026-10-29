@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-wgpu = "=30.0.1"
+
 [dependencies]
 engine-core = { path = "../engine-core" }
 png = "0.17"

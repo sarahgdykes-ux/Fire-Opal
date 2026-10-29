@@ -122,11 +122,11 @@ impl Engine {
         self.is_running
     }
 
+    /// Start-of-frame work. Per-frame input state (just_pressed, scroll, ...)
+    /// must survive until the game has seen it, so it is cleared in `end_frame`.
     fn update(&mut self) {
         let _delta = self.time.tick();
-        self.keyboard.update();
-        self.mouse.update();
-        
+
         // if let Some(audio) = &mut self.audio {  // Temporarily disabled
         //     audio.cleanup_finished();
         // }
@@ -134,6 +134,12 @@ impl Engine {
         let mouse_pos = self.mouse.position();
         let mouse_pressed = self.mouse.is_pressed(engine_input::MouseButton::Left);
         self.ui.update(mouse_pos, mouse_pressed);
+    }
+
+    /// End-of-frame work: clear one-frame input state after the game has run.
+    fn end_frame(&mut self) {
+        self.keyboard.update();
+        self.mouse.update();
     }
 
     fn handle_window_event(&mut self, event: WindowEvent) {
@@ -229,7 +235,7 @@ impl Engine {
             PhysicalKey::Code(WinitKeyCode::Digit7) => Some(KeyCode::Key7),
             PhysicalKey::Code(WinitKeyCode::Digit8) => Some(KeyCode::Key8),
             PhysicalKey::Code(WinitKeyCode::Digit9) => Some(KeyCode::Key9),
-            _ => Some(KeyCode::Unknown),
+            _ => None,
         }
     }
 
@@ -300,6 +306,7 @@ impl<T: Game> ApplicationHandler for EngineApp<T> {
         self.game.update(&mut self.engine);
         self.game.render(&mut self.engine);
         self.engine.present();
+        self.engine.end_frame();
 
         // Update window title
         if let Some(window) = &self.engine.window {

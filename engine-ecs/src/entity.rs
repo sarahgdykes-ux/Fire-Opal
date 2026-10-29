@@ -65,7 +65,9 @@ impl EntityPool {
     }
 
     pub fn deallocate(&mut self, entity: Entity) {
-        if !entity.is_valid() {
+        // Ignore stale or already-freed handles so an id is never pushed onto
+        // the free list twice.
+        if !self.is_alive(entity) {
             return;
         }
 
@@ -74,7 +76,9 @@ impl EntityPool {
             return;
         }
 
-        self.generations[id as usize] = self.generations[id as usize].wrapping_add(1);
+        // Generation 0 is reserved (Entity::new maps it to 1), so skip it on wrap.
+        let next = self.generations[id as usize].wrapping_add(1);
+        self.generations[id as usize] = if next == 0 { 1 } else { next };
         self.free_list.push(id);
     }
 
@@ -116,6 +120,19 @@ impl Default for EntityPool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_double_deallocate_does_not_duplicate_ids() {
+        let mut pool = EntityPool::new();
+        let e = pool.allocate();
+        pool.deallocate(e);
+        pool.deallocate(e); // stale handle, must be ignored
+
+        let x = pool.allocate();
+        let y = pool.allocate();
+        assert_ne!(x.id(), y.id());
+        assert!(!pool.is_alive(e));
+    }
 
     #[test]
     fn test_entity_creation() {
