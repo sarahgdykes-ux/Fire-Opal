@@ -21,6 +21,9 @@ impl PlatformerGame {
     }
 
     fn setup_ui(&mut self, engine: &mut Engine) {
+        // Start the camera on the player instead of swooping in from the origin.
+        engine.camera_mut().set_position(Vec2::new(self.player_pos.0, self.player_pos.1));
+
         let ui = engine.ui_mut();
 
         // Create HUD panel
@@ -51,9 +54,10 @@ impl Game for PlatformerGame {
         self.player_pos.0 += self.player_velocity.0 * dt;
         self.player_pos.1 += self.player_velocity.1 * dt;
 
-        // Simple floor collision
-        if self.player_pos.1 > 550.0 {
-            self.player_pos.1 = 550.0;
+        // Simple floor collision: the player is 40 tall, so its center rests
+        // 20 above the floor surface (y = 550).
+        if self.player_pos.1 > 530.0 {
+            self.player_pos.1 = 530.0;
             self.player_velocity.1 = 0.0;
         }
     }
@@ -95,9 +99,10 @@ impl Game for PlatformerGame {
             }
         }
 
-        // Camera follow
-        let camera = engine.camera_mut();
-        camera.set_position(Vec2::new(self.player_pos.0, self.player_pos.1));
+        // Smooth, frame-rate independent camera follow
+        let dt = engine.delta_time();
+        let target = Vec2::new(self.player_pos.0, self.player_pos.1);
+        engine.camera_mut().follow_smooth(target, 8.0, dt);
     }
 
     fn render(&mut self, engine: &mut Engine) {
@@ -118,24 +123,23 @@ impl Game for PlatformerGame {
             .filter_map(|x| x)
             .collect();
 
-        if let Some(renderer) = engine.renderer_mut() {
+        if let Some((camera, renderer)) = engine.camera_and_renderer() {
             renderer.clear();
 
-            // Draw player
+            // World-space drawing: the camera moves, zooms and rotates these.
+            let floor_rect = Rect::from_min_size(
+                Vec2::new(-5000.0, 550.0),
+                Vec2::new(10000.0, 50.0),
+            );
+            renderer.fill_rect_world(camera, floor_rect, Color::GREEN);
+
             let player_rect = Rect::from_min_size(
                 Vec2::new(self.player_pos.0 - 20.0, self.player_pos.1 - 20.0),
                 Vec2::new(40.0, 40.0),
             );
-            renderer.fill_rect(player_rect, Color::RED);
+            renderer.fill_rect_world(camera, player_rect, Color::RED);
 
-            // Draw floor
-            let floor_rect = Rect::from_min_size(
-                Vec2::new(0.0, 550.0),
-                Vec2::new(2000.0, 50.0),
-            );
-            renderer.fill_rect(floor_rect, Color::GREEN);
-
-            // Draw UI elements
+            // Screen-space drawing: the UI stays put, drawn on top of the world.
             for (bounds, color, _kind) in ui_draw_data {
                 renderer.fill_rect(bounds, color);
             }

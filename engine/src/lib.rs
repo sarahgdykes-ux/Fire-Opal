@@ -66,6 +66,19 @@ impl Engine {
     }
 
     /// Copies the software framebuffer to the window.
+    /// Borrows the camera and renderer together, for world-space drawing:
+    /// `renderer.fill_rect_world(camera, rect, color)`.
+    pub fn camera_and_renderer(&mut self) -> Option<(&Camera, &mut Renderer)> {
+        let renderer = self.renderer.as_mut()?;
+        Some((&self.camera, renderer))
+    }
+
+    /// The mouse cursor position in world coordinates (accounts for the
+    /// camera's position, zoom and rotation).
+    pub fn mouse_world_position(&self) -> engine_core::Vec2 {
+        self.camera.screen_to_world(self.mouse.position())
+    }
+
     pub fn present(&mut self) {
         let (Some(surface), Some(renderer)) = (self.surface.as_mut(), self.renderer.as_ref()) else {
             return;

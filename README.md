@@ -22,7 +22,7 @@ The engine is built with a modular crate structure:
 - **Software Rasterizer**: CPU-based rendering with pixel/line/triangle drawing to in-memory framebuffer
 - **Physics Engine**: AABB collision detection, impulse-based resolution, spatial partitioning
 - **Input System**: Keyboard, mouse, and action mapping with deadzone support
-- **Camera System**: 2D camera with position, zoom, rotation, and world-to-screen transforms
+- **Camera System**: 2D camera with position, zoom, rotation, smooth follow, and world/screen transforms. Draw with `renderer.fill_rect_world(camera, ...)`, `draw_line_world`, `draw_rect_world` (world space); the plain `fill_rect`/`draw_line` are screen space, for UI.
 - **UI System**: Buttons, labels, panels with hover/click states and z-ordering
 - **Animation System**: Frame-based animations with play modes (once, loop, ping-pong)
 
@@ -86,7 +86,7 @@ The engine is functionally complete with:
 - ✅ Main game loop with winit (variable `update` + fixed-timestep `fixed_update`)
 - ✅ Window display via softbuffer
 
-Not done yet: the camera is not applied by the renderer, and there is no text rendering (labels draw as plain rectangles).
+Not done yet: there is no text rendering (labels draw as plain rectangles).
 
 ## Example Game
 
@@ -108,7 +108,6 @@ The example opens a window showing the player, floor and UI; the FPS counter is 
 
 ## Future Enhancements
 
-- Apply the camera transform in the renderer
 - Text rendering (bitmap font)
 - Re-enable audio system (currently disabled due to Windows build issues)
 - Hardware-accelerated rendering (wgpu migration)
