@@ -1,1 +1,0 @@
-&windows::Win32::Graphics::Direct3D12::ID3D12Heap: Param<ID3D12Heap, windows_core::InterfaceType>
