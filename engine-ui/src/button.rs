@@ -6,6 +6,8 @@ pub struct Button {
     pub element: UIElement,
     pub text: String,
     pub text_color: Color,
+    /// Integer scale of the 8x8 font (2 = 16px text).
+    pub text_scale: u32,
     pub hover_color: Color,
     pub click_color: Color,
     pub is_hovered: bool,
@@ -20,6 +22,7 @@ impl Button {
                 .with_background_color(Color::new(0.2, 0.2, 0.2, 1.0)),
             text,
             text_color: Color::WHITE,
+            text_scale: 2,
             hover_color: Color::new(0.3, 0.3, 0.3, 1.0),
             click_color: Color::new(0.4, 0.4, 0.4, 1.0),
             is_hovered: false,
@@ -29,6 +32,11 @@ impl Button {
 
     pub fn with_text_color(mut self, color: Color) -> Self {
         self.text_color = color;
+        self
+    }
+
+    pub fn with_text_scale(mut self, scale: u32) -> Self {
+        self.text_scale = scale.max(1);
         self
     }
 

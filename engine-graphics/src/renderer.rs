@@ -1,5 +1,6 @@
 use engine_core::{Color, Vec2, Rect};
 use crate::camera::Camera;
+use crate::font::{self, GLYPH_SIZE};
 use crate::texture::Texture;
 
 pub struct Renderer {
@@ -44,7 +45,33 @@ impl Renderer {
             return;
         }
 
-        self.framebuffer.set_pixel(x, y, color);
+        self.put_pixel(x, y, color);
+    }
+
+    /// Writes a pixel, alpha-blending it over what is already there when the
+    /// color is translucent. Opaque colors are a plain overwrite.
+    fn put_pixel(&mut self, x: u32, y: u32, color: Color) {
+        if color.a >= 1.0 {
+            self.framebuffer.set_pixel(x, y, color);
+            return;
+        }
+        if !(color.a > 0.0) {
+            return; // fully transparent (or NaN): nothing to draw
+        }
+        if let Some(dst) = self.framebuffer.get_pixel(x, y) {
+            let a = color.a;
+            let inv = 1.0 - a;
+            self.framebuffer.set_pixel(
+                x,
+                y,
+                Color::new(
+                    color.r * a + dst.r * inv,
+                    color.g * a + dst.g * inv,
+                    color.b * a + dst.b * inv,
+                    a + dst.a * inv,
+                ),
+            );
+        }
     }
 
     pub fn draw_line(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, color: Color) {
@@ -105,7 +132,7 @@ impl Renderer {
 
         for y in min_y..max_y {
             for x in min_x..max_x {
-                self.framebuffer.set_pixel(x, y, color);
+                self.put_pixel(x, y, color);
             }
         }
     }
@@ -173,6 +200,75 @@ impl Renderer {
 
             curx1 -= inv_slope1;
             curx2 -= inv_slope2;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Text (screen space)
+    // ------------------------------------------------------------------
+
+    /// Draws `text` with its top-left corner at (`x`, `y`) in screen pixels,
+    /// using the built-in 8x8 bitmap font. Each font pixel becomes a
+    /// `scale` x `scale` block (`scale` 2 gives 16px text). Supports `\n`
+    /// line breaks; non-ASCII characters are drawn as `?`. Anything outside
+    /// the framebuffer is clipped. Use `font::measure_text` to size or centre it.
+    pub fn draw_text(&mut self, x: i32, y: i32, text: &str, color: Color, scale: u32) {
+        let scale = scale.clamp(1, font::MAX_SCALE) as i32;
+        let cell = GLYPH_SIZE as i32 * scale;
+        let w = self.framebuffer.width as i32;
+        let h = self.framebuffer.height as i32;
+
+        let mut cx = x;
+        let mut cy = y;
+        for c in text.chars() {
+            if c == '\n' {
+                cx = x;
+                cy = cy.saturating_add(cell);
+                if cy >= h {
+                    break; // everything further down is off screen
+                }
+                continue;
+            }
+
+            let advance = font::advance_cells(c) as i32;
+            let visible = c != '\t'
+                && c != '\r'
+                && cx < w
+                && cx.saturating_add(cell) > 0
+                && cy < h
+                && cy.saturating_add(cell) > 0;
+            if visible {
+                self.draw_glyph(cx, cy, font::glyph(c), color, scale);
+            }
+            cx = cx.saturating_add(cell.saturating_mul(advance));
+        }
+    }
+
+    fn draw_glyph(&mut self, x: i32, y: i32, glyph: &[u8; 8], color: Color, scale: i32) {
+        for row in 0..GLYPH_SIZE {
+            for col in 0..GLYPH_SIZE {
+                if font::pixel_set(glyph, col, row) {
+                    self.fill_block(
+                        x.saturating_add(col as i32 * scale),
+                        y.saturating_add(row as i32 * scale),
+                        scale,
+                        color,
+                    );
+                }
+            }
+        }
+    }
+
+    /// Fills a `size` x `size` block at integer (`x`, `y`), clipped to the framebuffer.
+    fn fill_block(&mut self, x: i32, y: i32, size: i32, color: Color) {
+        let x0 = x.max(0);
+        let y0 = y.max(0);
+        let x1 = x.saturating_add(size).min(self.framebuffer.width as i32);
+        let y1 = y.saturating_add(size).min(self.framebuffer.height as i32);
+        for py in y0..y1 {
+            for px in x0..x1 {
+                self.put_pixel(px as u32, py as u32, color);
+            }
         }
     }
 
@@ -245,7 +341,7 @@ impl Renderer {
             for x in x0..x1 {
                 let p = inv.transform_point(Vec2::new(x as f32 + 0.5, y as f32 + 0.5));
                 if p.x >= min.x && p.x < max.x && p.y >= min.y && p.y < max.y {
-                    self.framebuffer.set_pixel(x, y, color);
+                    self.put_pixel(x, y, color);
                 }
             }
         }
@@ -504,5 +600,128 @@ mod tests {
         r.fill_rect(Rect::new(Vec2::new(nan, 0.0), Vec2::new(5.0, 5.0)), Color::RED);
         r.fill_rect(Rect::new(Vec2::new(0.0, 0.0), Vec2::new(f32::INFINITY, 5.0)), Color::RED);
         assert_eq!(count(&r, Color::RED), 0);
+    }
+
+    // ---- text ----
+
+    fn glyph_pattern(c: char) -> Vec<(u32, u32)> {
+        let g = font::glyph(c);
+        let mut v = Vec::new();
+        for y in 0..8 {
+            for x in 0..8 {
+                if font::pixel_set(g, x, y) {
+                    v.push((x, y));
+                }
+            }
+        }
+        v
+    }
+
+    #[test]
+    fn test_draw_text_matches_glyph_bitmap() {
+        let mut r = Renderer::new(20, 20);
+        r.clear();
+        r.draw_text(3, 4, "A", Color::WHITE, 1);
+
+        let expected = glyph_pattern('A');
+        assert!(!expected.is_empty());
+        assert_eq!(count(&r, Color::WHITE), expected.len());
+        for (x, y) in expected {
+            assert_eq!(r.framebuffer().get_pixel(3 + x, 4 + y), Some(Color::WHITE));
+        }
+    }
+
+    #[test]
+    fn test_draw_text_scale_multiplies_pixels() {
+        let mut one = Renderer::new(64, 64);
+        one.clear();
+        one.draw_text(0, 0, "Score: 10", Color::WHITE, 1);
+        let mut three = Renderer::new(64, 64);
+        three.clear();
+        three.draw_text(0, 0, "Sc", Color::WHITE, 3);
+
+        let mut two_chars = Renderer::new(64, 64);
+        two_chars.clear();
+        two_chars.draw_text(0, 0, "Sc", Color::WHITE, 1);
+        assert_eq!(count(&three, Color::WHITE), count(&two_chars, Color::WHITE) * 9);
+        assert!(count(&one, Color::WHITE) > 0);
+    }
+
+    #[test]
+    fn test_draw_text_advances_and_wraps_lines() {
+        let mut r = Renderer::new(64, 64);
+        r.clear();
+        r.draw_text(0, 0, "A\nA", Color::WHITE, 1);
+        let pat = glyph_pattern('A');
+        // second line starts 8px lower, first column is x=0 again
+        for (x, y) in &pat {
+            assert_eq!(r.framebuffer().get_pixel(*x, *y + 8), Some(Color::WHITE));
+        }
+
+        let mut s = Renderer::new(64, 64);
+        s.clear();
+        s.draw_text(0, 0, "AA", Color::WHITE, 1);
+        for (x, y) in &pat {
+            assert_eq!(s.framebuffer().get_pixel(*x + 8, *y), Some(Color::WHITE));
+        }
+    }
+
+    #[test]
+    fn test_draw_text_is_clipped_and_overflow_safe() {
+        let mut r = Renderer::new(16, 16);
+        r.clear();
+        // partially off the top-left: draws the visible part only
+        r.draw_text(-4, -4, "A", Color::WHITE, 1);
+        assert!(count(&r, Color::WHITE) > 0);
+
+        // fully off screen / extreme coordinates / huge scale: nothing drawn, no panic
+        let mut e = Renderer::new(16, 16);
+        e.clear();
+        e.draw_text(-10_000, -10_000, "hello", Color::WHITE, 1);
+        e.draw_text(i32::MAX, i32::MAX, "hello\nworld", Color::WHITE, 3);
+        e.draw_text(i32::MIN, i32::MIN, "hello", Color::WHITE, u32::MAX);
+        e.draw_text(0, 0, "", Color::WHITE, 1);
+        assert_eq!(count(&e, Color::WHITE), 0);
+    }
+
+    #[test]
+    fn test_draw_text_handles_unprintable_and_non_ascii() {
+        let mut r = Renderer::new(32, 16);
+        r.clear();
+        r.draw_text(0, 0, "\u{e9}", Color::WHITE, 1); // drawn as '?'
+        let mut q = Renderer::new(32, 16);
+        q.clear();
+        q.draw_text(0, 0, "?", Color::WHITE, 1);
+        assert_eq!(count(&r, Color::WHITE), count(&q, Color::WHITE));
+
+        let mut t = Renderer::new(64, 16);
+        t.clear();
+        t.draw_text(0, 0, "\t\r", Color::WHITE, 1);
+        assert_eq!(count(&t, Color::WHITE), 0);
+    }
+
+    // ---- alpha blending ----
+
+    #[test]
+    fn test_translucent_fill_blends_over_background() {
+        let mut r = Renderer::new(10, 10);
+        r.set_clear_color(Color::BLACK);
+        r.clear();
+        r.fill_rect(
+            Rect::from_min_size(Vec2::ZERO, Vec2::new(10.0, 10.0)),
+            Color::new(1.0, 0.0, 0.0, 0.5),
+        );
+        let p = r.framebuffer().get_pixel(5, 5).unwrap();
+        assert!((p.r - 0.5).abs() < 1e-5 && p.g == 0.0 && (p.a - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_transparent_color_leaves_pixels_untouched() {
+        let mut r = Renderer::new(10, 10);
+        r.set_clear_color(Color::BLUE);
+        r.clear();
+        r.fill_rect(Rect::from_min_size(Vec2::ZERO, Vec2::new(10.0, 10.0)), Color::TRANSPARENT);
+        r.set_pixel(1, 1, Color::TRANSPARENT);
+        assert_eq!(count(&r, Color::BLUE), 100);
     }
 }

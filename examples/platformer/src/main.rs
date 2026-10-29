@@ -106,23 +106,6 @@ impl Game for PlatformerGame {
     }
 
     fn render(&mut self, engine: &mut Engine) {
-        // Collect UI element data before borrowing renderer
-        let ui = engine.ui();
-        let ui_draw_data: Vec<_> = ui.get_visible_elements()
-            .into_iter()
-            .map(|(id, element)| {
-                let draw_data = if let Some(button) = ui.get_button(id) {
-                    Some((element.bounds, button.get_current_color(), element.kind))
-                } else if ui.get_label(id).is_some() {
-                    Some((element.bounds, Color::BLUE, element.kind))
-                } else {
-                    Some((element.bounds, element.background_color, element.kind))
-                };
-                draw_data
-            })
-            .filter_map(|x| x)
-            .collect();
-
         if let Some((camera, renderer)) = engine.camera_and_renderer() {
             renderer.clear();
 
@@ -138,12 +121,10 @@ impl Game for PlatformerGame {
                 Vec2::new(40.0, 40.0),
             );
             renderer.fill_rect_world(camera, player_rect, Color::RED);
-
-            // Screen-space drawing: the UI stays put, drawn on top of the world.
-            for (bounds, color, _kind) in ui_draw_data {
-                renderer.fill_rect(bounds, color);
-            }
         }
+
+        // Screen-space UI (panel, score text, Jump button) on top of the world.
+        engine.render_ui();
     }
 }
 

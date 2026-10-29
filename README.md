@@ -29,6 +29,7 @@ The engine is built with a modular crate structure:
 ### Graphics
 - Software rasterizer rendering to in-memory framebuffer
 - Texture loading (PNG)
+- Text: built-in 8x8 bitmap font (printable ASCII), integer scaling, multi-line, alpha blending. `renderer.draw_text(x, y, "Hello", color, scale)`; `font::measure_text` for layout. `engine.render_ui()` draws all UI widgets with their text.
 - Sprite batching with z-ordering
 - View culling
 - Frame-based animations
@@ -49,7 +50,7 @@ The software rasterizer draws to an in-memory framebuffer, which the engine copi
 - Axis mapping (WASD to movement vectors)
 
 ### UI
-- UI elements: Panels, Buttons, Labels
+- UI elements: Panels, Buttons, Labels (with rendered text, `text_scale`, centered button text)
 - Hover and click state detection
 - Z-ordering for layered UI
 - Visibility and enabled states
@@ -86,7 +87,7 @@ The engine is functionally complete with:
 - ✅ Main game loop with winit (variable `update` + fixed-timestep `fixed_update`)
 - ✅ Window display via softbuffer
 
-Not done yet: there is no text rendering (labels draw as plain rectangles).
+Not done yet: world-space (camera-transformed) text, and clipping text to its widget.
 
 ## Example Game
 
@@ -122,3 +123,5 @@ The example opens a window showing the player, floor and UI; the FPS counter is 
 ## License
 
 MIT
+
+The built-in font data is the public-domain `font8x8` (Daniel Hepper), taken from the MIT-licensed `font8x8` crate (Copyright (c) 2017 Joaquin Rosales). See `engine-graphics/src/font.rs`.

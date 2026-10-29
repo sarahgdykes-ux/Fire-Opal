@@ -1,6 +1,7 @@
 pub mod texture;
 pub mod renderer;
 pub mod camera;
+pub mod font;
 pub mod sprite;
 pub mod animation;
 

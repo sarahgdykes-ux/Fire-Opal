@@ -73,6 +73,14 @@ impl Engine {
         Some((&self.camera, renderer))
     }
 
+    /// Draws all visible UI widgets (panels, labels, buttons) on top of
+    /// whatever has been rendered this frame. Call it last in `Game::render`.
+    pub fn render_ui(&mut self) {
+        if let Some(renderer) = self.renderer.as_mut() {
+            self.ui.render(renderer);
+        }
+    }
+
     /// The mouse cursor position in world coordinates (accounts for the
     /// camera's position, zoom and rotation).
     pub fn mouse_world_position(&self) -> engine_core::Vec2 {

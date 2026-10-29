@@ -6,6 +6,8 @@ pub struct Label {
     pub element: UIElement,
     pub text: String,
     pub text_color: Color,
+    /// Integer scale of the 8x8 font (2 = 16px text).
+    pub text_scale: u32,
 }
 
 impl Label {
@@ -15,7 +17,13 @@ impl Label {
             element: UIElement::new(UIElementKind::Label, bounds),
             text,
             text_color: Color::WHITE,
+            text_scale: 2,
         }
+    }
+
+    pub fn with_text_scale(mut self, scale: u32) -> Self {
+        self.text_scale = scale.max(1);
+        self
     }
 
     pub fn with_text_color(mut self, color: Color) -> Self {
