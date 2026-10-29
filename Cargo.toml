@@ -1,0 +1,21 @@
+[workspace]
+members = [
+    "engine-core",
+    "engine-ecs",
+    "engine-graphics",
+    "engine-physics",
+    "engine-input",
+    "engine-audio",
+    "engine-ui",
+    "engine",
+    "examples/platformer",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Sarah"]
+license = "MIT"
+
+[workspace.dependencies]

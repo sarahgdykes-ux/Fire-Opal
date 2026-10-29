@@ -1,0 +1,10 @@
+[package]
+name = "engine-ui"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+engine-core = { path = "../engine-core" }
+engine-graphics = { path = "../engine-graphics" }
