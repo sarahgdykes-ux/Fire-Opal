@@ -5,11 +5,13 @@ use crate::button::Button;
 use crate::label::Label;
 use crate::panel::Panel;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct UIElementId(pub usize);
 
+/// Owns all UI widgets. Each widget (and its `UIElement`) is stored exactly once,
+/// in the map for its kind, so mutating a widget (e.g. `button.element.visible`)
+/// is always reflected when drawing.
 pub struct UIManager {
-    elements: HashMap<UIElementId, UIElement>,
     buttons: HashMap<UIElementId, Button>,
     labels: HashMap<UIElementId, Label>,
     panels: HashMap<UIElementId, Panel>,
@@ -21,7 +23,6 @@ pub struct UIManager {
 impl UIManager {
     pub fn new() -> Self {
         Self {
-            elements: HashMap::new(),
             buttons: HashMap::new(),
             labels: HashMap::new(),
             panels: HashMap::new(),
@@ -31,32 +32,31 @@ impl UIManager {
         }
     }
 
-    pub fn add_panel(&mut self, panel: Panel) -> UIElementId {
+    fn alloc_id(&mut self) -> UIElementId {
         let id = UIElementId(self.next_id);
         self.next_id += 1;
-        self.elements.insert(id, panel.element.clone());
+        id
+    }
+
+    pub fn add_panel(&mut self, panel: Panel) -> UIElementId {
+        let id = self.alloc_id();
         self.panels.insert(id, panel);
         id
     }
 
     pub fn add_button(&mut self, button: Button) -> UIElementId {
-        let id = UIElementId(self.next_id);
-        self.next_id += 1;
-        self.elements.insert(id, button.element.clone());
+        let id = self.alloc_id();
         self.buttons.insert(id, button);
         id
     }
 
     pub fn add_label(&mut self, label: Label) -> UIElementId {
-        let id = UIElementId(self.next_id);
-        self.next_id += 1;
-        self.elements.insert(id, label.element.clone());
+        let id = self.alloc_id();
         self.labels.insert(id, label);
         id
     }
 
     pub fn remove(&mut self, id: UIElementId) {
-        self.elements.remove(&id);
         self.buttons.remove(&id);
         self.labels.remove(&id);
         self.panels.remove(&id);
@@ -78,6 +78,31 @@ impl UIManager {
         self.labels.get_mut(&id)
     }
 
+    pub fn get_panel(&self, id: UIElementId) -> Option<&Panel> {
+        self.panels.get(&id)
+    }
+
+    pub fn get_panel_mut(&mut self, id: UIElementId) -> Option<&mut Panel> {
+        self.panels.get_mut(&id)
+    }
+
+    /// The common `UIElement` data of any widget, regardless of its kind.
+    pub fn get_element(&self, id: UIElementId) -> Option<&UIElement> {
+        self.buttons.get(&id).map(|b| &b.element)
+            .or_else(|| self.labels.get(&id).map(|l| &l.element))
+            .or_else(|| self.panels.get(&id).map(|p| &p.element))
+    }
+
+    pub fn get_element_mut(&mut self, id: UIElementId) -> Option<&mut UIElement> {
+        if let Some(b) = self.buttons.get_mut(&id) {
+            return Some(&mut b.element);
+        }
+        if let Some(l) = self.labels.get_mut(&id) {
+            return Some(&mut l.element);
+        }
+        self.panels.get_mut(&id).map(|p| &mut p.element)
+    }
+
     pub fn update(&mut self, mouse_pos: Vec2, mouse_pressed: bool) {
         // Remember last frame's pressed state *before* overwriting it, so
         // `is_button_clicked` can detect the pressed/not-pressed edge correctly.
@@ -85,7 +110,13 @@ impl UIManager {
         self.mouse_pressed = mouse_pressed;
 
         for button in self.buttons.values_mut() {
-            button.update(mouse_pos, mouse_pressed);
+            if button.element.visible && button.element.enabled {
+                button.update(mouse_pos, mouse_pressed);
+            } else {
+                // Hidden or disabled buttons can't be hovered or clicked.
+                button.is_hovered = false;
+                button.is_clicked = false;
+            }
         }
     }
 
@@ -100,19 +131,22 @@ impl UIManager {
         }
     }
 
+    /// Visible elements in draw order: ascending z-index, ties broken by
+    /// creation order (id) so the order is deterministic from frame to frame.
     pub fn get_visible_elements(&self) -> Vec<(UIElementId, &UIElement)> {
-        let mut elements: Vec<_> = self.elements
-            .iter()
+        let mut elements: Vec<(UIElementId, &UIElement)> = self.buttons.iter().map(|(id, b)| (*id, &b.element))
+            .chain(self.labels.iter().map(|(id, l)| (*id, &l.element)))
+            .chain(self.panels.iter().map(|(id, p)| (*id, &p.element)))
             .filter(|(_, e)| e.visible)
-            .map(|(id, e)| (*id, e))
             .collect();
-        
-        elements.sort_by(|a, b| a.1.z_index.partial_cmp(&b.1.z_index).unwrap());
+
+        elements.sort_by(|a, b| {
+            a.1.z_index.total_cmp(&b.1.z_index).then_with(|| a.0.cmp(&b.0))
+        });
         elements
     }
 
     pub fn clear(&mut self) {
-        self.elements.clear();
         self.buttons.clear();
         self.labels.clear();
         self.panels.clear();
@@ -154,5 +188,55 @@ mod tests {
         
         let id = manager.add_label(label);
         assert!(manager.get_label(id).is_some());
+    }
+
+    #[test]
+    fn test_hiding_widget_removes_it_from_draw_list() {
+        let mut manager = UIManager::new();
+        let bounds = Rect::from_min_size(Vec2::new(0.0, 0.0), Vec2::new(100.0, 30.0));
+        let id = manager.add_button(Button::new(bounds, "Test"));
+        assert_eq!(manager.get_visible_elements().len(), 1);
+
+        manager.get_button_mut(id).unwrap().element.visible = false;
+        assert!(manager.get_visible_elements().is_empty());
+    }
+
+    #[test]
+    fn test_draw_order_is_deterministic_for_equal_z() {
+        let mut manager = UIManager::new();
+        let bounds = Rect::from_min_size(Vec2::new(0.0, 0.0), Vec2::new(10.0, 10.0));
+        let ids = [
+            manager.add_panel(Panel::new(bounds)),
+            manager.add_label(Label::new(bounds, "a")),
+            manager.add_button(Button::new(bounds, "b")),
+            manager.add_label(Label::new(bounds, "c")),
+        ];
+        for _ in 0..20 {
+            let order: Vec<_> = manager.get_visible_elements().into_iter().map(|(id, _)| id).collect();
+            assert_eq!(order, ids);
+        }
+    }
+
+    #[test]
+    fn test_z_index_overrides_creation_order() {
+        let mut manager = UIManager::new();
+        let bounds = Rect::from_min_size(Vec2::new(0.0, 0.0), Vec2::new(10.0, 10.0));
+        let front = manager.add_panel(Panel::new(bounds));
+        let back = manager.add_panel(Panel::new(bounds));
+        manager.get_element_mut(front).unwrap().z_index = 5.0;
+        let order: Vec<_> = manager.get_visible_elements().into_iter().map(|(id, _)| id).collect();
+        assert_eq!(order, vec![back, front]);
+    }
+
+    #[test]
+    fn test_hidden_button_cannot_be_clicked() {
+        let mut manager = UIManager::new();
+        let bounds = Rect::from_min_size(Vec2::new(0.0, 0.0), Vec2::new(100.0, 30.0));
+        let id = manager.add_button(Button::new(bounds, "Test"));
+        manager.get_button_mut(id).unwrap().element.visible = false;
+
+        manager.update(Vec2::new(5.0, 5.0), false);
+        manager.update(Vec2::new(5.0, 5.0), true);
+        assert!(!manager.is_button_clicked(id));
     }
 }

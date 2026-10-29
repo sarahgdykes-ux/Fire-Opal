@@ -31,6 +31,11 @@ pub struct Time {
 }
 
 impl Time {
+    /// Longest frame time (seconds) fed into the fixed-step accumulator. After a
+    /// stall (window drag, breakpoint, ...) the game catches up by at most this
+    /// much instead of running hundreds of fixed steps in one frame.
+    pub const MAX_ACCUMULATED_FRAME: f32 = 0.25;
+
     pub fn new(fixed_time_step: f32) -> Self {
         let now = Instant::now();
         Self {
@@ -51,7 +56,7 @@ impl Time {
         let duration = now.duration_since(self.last_frame_time);
         self.delta_time = duration.as_secs_f32();
         self.last_frame_time = now;
-        self.accumulator += self.delta_time;
+        self.accumulator += self.delta_time.min(Self::MAX_ACCUMULATED_FRAME);
         self.frame_count += 1;
         self.fps_frame_count += 1;
 
@@ -84,6 +89,12 @@ impl Time {
         } else {
             false
         }
+    }
+
+    /// How far (0..1) the current frame is between the last and next fixed step.
+    /// Useful for interpolating rendering between physics states.
+    pub fn alpha(&self) -> f32 {
+        (self.accumulator / self.fixed_time_step).clamp(0.0, 1.0)
     }
 
     pub fn elapsed(&self) -> Duration {
@@ -139,6 +150,27 @@ mod tests {
         let dt = time.tick();
         assert!(dt.as_secs_f32() > 0.015);
         assert!(dt.as_secs_f32() < 0.02);
+    }
+
+    #[test]
+    fn test_long_stall_is_clamped() {
+        let mut time = Time::new(1.0 / 60.0);
+        time.last_frame_time -= Duration::from_secs(5);
+        time.tick();
+
+        let mut steps = 0;
+        while time.consume_fixed_step() {
+            steps += 1;
+        }
+        assert!(steps <= 15, "a 5s stall ran {} fixed steps", steps);
+        assert!(steps >= 1);
+    }
+
+    #[test]
+    fn test_alpha_is_fraction_of_step() {
+        let mut time = Time::new(0.02);
+        time.accumulator = 0.005;
+        assert!((time.alpha() - 0.25).abs() < 1e-6);
     }
 
     #[test]

@@ -34,7 +34,7 @@ The engine is built with a modular crate structure:
 - Frame-based animations
 - Animation play modes (Once, Loop, PingPong)
 
-**Note**: The software rasterizer draws to an in-memory framebuffer. The rendering logic is complete and tested, but display integration to the window needs to be added (see below).
+The software rasterizer draws to an in-memory framebuffer, which the engine copies to the window each frame using [softbuffer](https://crates.io/crates/softbuffer). The framebuffer resizes with the window.
 
 ### Physics
 - Static, dynamic, and kinematic bodies
@@ -83,16 +83,10 @@ The engine is functionally complete with:
 - ✅ Input system (keyboard, mouse, action mapping)
 - ✅ UI system (buttons, labels, panels)
 - ✅ Animation system
-- ✅ Main game loop with winit
+- ✅ Main game loop with winit (variable `update` + fixed-timestep `fixed_update`)
+- ✅ Window display via softbuffer
 
-**What's missing for display:**
-The software rasterizer renders to an in-memory framebuffer but doesn't display it to the window yet. To add display, you would need to integrate with:
-
-1. **wgpu** (recommended for production): Hardware-accelerated rendering
-2. **softbuffer**: Software display library to blit framebuffer to window
-3. **Platform-specific code**: Windows GDI, Linux X11, macOS Metal
-
-The rendering logic itself is complete - only the display integration remains.
+Not done yet: the camera is not applied by the renderer, and there is no text rendering (labels draw as plain rectangles).
 
 ## Example Game
 
@@ -103,62 +97,7 @@ A simple platformer example is included in `examples/platformer`. It demonstrate
 - Camera following the player
 - UI system with score display and jump button
 
-The example window will open and run the game loop (you'll see the FPS counter in the window title), but the screen will be white because the framebuffer isn't being displayed to the window yet.
-
-## Adding Display Integration
-
-To add display to the window, modify `engine/src/lib.rs`:
-
-### Option 1: Using softbuffer (recommended for software rendering)
-
-1. Add to `engine/Cargo.toml`:
-```toml
-[dependencies]
-softbuffer = "0.4"
-```
-
-2. Modify `Engine` struct to include:
-```rust
-pub struct Engine {
-    window: Option<Window>,
-    renderer: Option<Renderer>,
-    surface: Option<softbuffer::Surface<softbuffer::Context<Window>, Window>>,
-    context: Option<softbuffer::Context<Window>>,
-    // ... other fields
-}
-```
-
-3. Initialize in `resumed()`:
-```rust
-let context = softbuffer::Context::new(window.clone()).unwrap();
-let surface = context.new_surface(
-    window.inner_size().width,
-    window.inner_size().height,
-).unwrap();
-self.engine.context = Some(context);
-self.engine.surface = Some(surface);
-```
-
-4. Update `present()` to copy framebuffer:
-```rust
-pub fn present(&mut self) {
-    if let (Some(surface), Some(renderer)) = (&mut self.surface, &self.renderer) {
-        let framebuffer = renderer.framebuffer();
-        let mut buffer = surface.buffer_mut().unwrap();
-        
-        for (i, pixel) in framebuffer.data.iter().enumerate() {
-            let rgba = pixel.to_rgba_u8();
-            buffer[i] = ((rgba.3 as u32) << 24) | ((rgba.0 as u32) << 16) | ((rgba.1 as u32) << 8) | (rgba.2 as u32);
-        }
-        
-        buffer.present().unwrap();
-    }
-}
-```
-
-### Option 2: Using wgpu (recommended for production)
-
-Follow the wgpu documentation to create a render pipeline and texture upload from the framebuffer data.
+The example opens a window showing the player, floor and UI; the FPS counter is in the window title.
 
 ## Design Philosophy
 
@@ -169,7 +108,8 @@ Follow the wgpu documentation to create a render pipeline and texture upload fro
 
 ## Future Enhancements
 
-- **Display Integration**: Add wgpu or softbuffer for actual framebuffer display
+- Apply the camera transform in the renderer
+- Text rendering (bitmap font)
 - Re-enable audio system (currently disabled due to Windows build issues)
 - Hardware-accelerated rendering (wgpu migration)
 - More physics features (rotation, polygons, continuous collision detection)

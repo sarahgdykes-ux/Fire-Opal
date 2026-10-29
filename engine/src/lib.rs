@@ -1,3 +1,6 @@
+use std::num::NonZeroU32;
+use std::sync::Arc;
+
 use winit::{
     application::ApplicationHandler,
     event::{WindowEvent},
@@ -16,7 +19,8 @@ pub use engine_input::InputAction;
 pub use engine_ui::{Button, Label, Panel, UIElementId, UIElementKind};
 
 pub struct Engine {
-    window: Option<Window>,
+    window: Option<Arc<Window>>,
+    surface: Option<softbuffer::Surface<Arc<Window>, Arc<Window>>>,
     renderer: Option<Renderer>,
     camera: Camera,
     keyboard: Keyboard,
@@ -32,6 +36,7 @@ impl Engine {
     pub fn new(window_width: u32, window_height: u32) -> Self {
         Self {
             window: None,
+            surface: None,
             renderer: None,
             camera: Camera::new(window_width as f32, window_height as f32),
             keyboard: Keyboard::new(),
@@ -60,21 +65,30 @@ impl Engine {
         self.renderer.as_mut()
     }
 
+    /// Copies the software framebuffer to the window.
     pub fn present(&mut self) {
-        // Display integration placeholder
-        // The software rasterizer renders to an in-memory framebuffer
-        // To display it to the window, you need to integrate with:
-        // - softbuffer (recommended for software rendering)
-        // - wgpu (recommended for hardware-accelerated rendering)
-        // - Platform-specific code (Windows GDI, Linux X11, macOS Metal)
-        
-        // For now, we print debug info to show rendering is happening
-        if let Some(renderer) = &self.renderer {
-            let fb = renderer.framebuffer();
-            // Print every 60 frames to avoid spam
-            if self.time.frame_count() % 60 == 0 {
-                println!("Rendering {} pixels at {:.0} FPS", fb.data.len(), self.time.fps());
+        let (Some(surface), Some(renderer)) = (self.surface.as_mut(), self.renderer.as_ref()) else {
+            return;
+        };
+
+        let fb = renderer.framebuffer();
+        let (Some(w), Some(h)) = (NonZeroU32::new(fb.width), NonZeroU32::new(fb.height)) else {
+            return; // minimized / zero-sized window: nothing to draw
+        };
+
+        if let Err(e) = surface.resize(w, h) {
+            eprintln!("fire-opal: failed to resize surface: {e}");
+            return;
+        }
+
+        match surface.buffer_mut() {
+            Ok(mut buffer) => {
+                fb.blit_to_u32(&mut buffer, fb.width, fb.height);
+                if let Err(e) = buffer.present() {
+                    eprintln!("fire-opal: failed to present frame: {e}");
+                }
             }
+            Err(e) => eprintln!("fire-opal: failed to get surface buffer: {e}"),
         }
     }
 
@@ -108,6 +122,16 @@ impl Engine {
 
     pub fn fps(&self) -> f32 {
         self.time.fps()
+    }
+
+    /// Length of one fixed simulation step, in seconds.
+    pub fn fixed_delta_time(&self) -> f32 {
+        self.time.fixed_time_step()
+    }
+
+    /// Progress (0..1) between the last and next fixed step, for render interpolation.
+    pub fn alpha(&self) -> f32 {
+        self.time.alpha()
     }
 
     pub fn frame_count(&self) -> u64 {
@@ -148,6 +172,9 @@ impl Engine {
                 self.is_running = false;
             }
             WindowEvent::Resized(physical_size) => {
+                if let Some(renderer) = &mut self.renderer {
+                    renderer.resize(physical_size.width, physical_size.height);
+                }
                 self.camera.set_viewport_size(engine_core::Vec2::new(
                     physical_size.width as f32,
                     physical_size.height as f32,
@@ -250,6 +277,12 @@ impl Engine {
 }
 
 pub trait Game {
+    /// Runs zero or more times per frame at a constant `dt` (see
+    /// `Engine::fixed_delta_time`). Put physics and other simulation here so it
+    /// behaves the same regardless of frame rate. Optional.
+    fn fixed_update(&mut self, _engine: &mut Engine, _dt: f32) {}
+
+    /// Runs once per frame with a variable delta. Good for input and UI.
     fn update(&mut self, engine: &mut Engine);
     fn render(&mut self, engine: &mut Engine);
 }
@@ -276,16 +309,30 @@ impl<T: Game> EngineApp<T> {
 
 impl<T: Game> ApplicationHandler for EngineApp<T> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        // `resumed` can fire more than once (e.g. mobile); only create the window once.
+        if self.engine.window.is_some() {
+            return;
+        }
+
         let window_attributes = Window::default_attributes()
             .with_title("Fire Opal Engine")
             .with_inner_size(winit::dpi::PhysicalSize::new(800, 600));
 
-        self.engine.window = Some(event_loop.create_window(window_attributes).unwrap());
+        let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
+        let size = window.inner_size();
 
-        if let Some(window) = &self.engine.window {
-            let size = window.inner_size();
-            self.engine.renderer = Some(Renderer::new(size.width, size.height));
-        }
+        let context = softbuffer::Context::new(window.clone())
+            .expect("failed to create softbuffer context");
+        let surface = softbuffer::Surface::new(&context, window.clone())
+            .expect("failed to create softbuffer surface");
+
+        self.engine.renderer = Some(Renderer::new(size.width, size.height));
+        self.engine.camera.set_viewport_size(engine_core::Vec2::new(
+            size.width as f32,
+            size.height as f32,
+        ));
+        self.engine.surface = Some(surface);
+        self.engine.window = Some(window);
     }
 
     fn window_event(
@@ -303,6 +350,11 @@ impl<T: Game> ApplicationHandler for EngineApp<T> {
 
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
         self.engine.update();
+
+        let step = self.engine.fixed_delta_time();
+        while self.engine.time.consume_fixed_step() {
+            self.game.fixed_update(&mut self.engine, step);
+        }
         self.game.update(&mut self.engine);
         self.game.render(&mut self.engine);
         self.engine.present();

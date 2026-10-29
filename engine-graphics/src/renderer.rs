@@ -14,6 +14,15 @@ impl Renderer {
         }
     }
 
+    /// Resizes the framebuffer. Contents are discarded (the next `clear()`
+    /// repaints it). Does nothing if the size is unchanged.
+    pub fn resize(&mut self, width: u32, height: u32) {
+        if width == self.framebuffer.width && height == self.framebuffer.height {
+            return;
+        }
+        self.framebuffer = Texture::new(width, height);
+    }
+
     pub fn set_clear_color(&mut self, color: Color) {
         self.clear_color = color;
     }
@@ -225,5 +234,18 @@ mod tests {
         let pixel = renderer.framebuffer().get_pixel(15, 15);
         assert!(pixel.is_some());
         assert_eq!(pixel.unwrap(), Color::YELLOW);
+    }
+
+    #[test]
+    fn test_renderer_resize() {
+        let mut renderer = Renderer::new(10, 10);
+        renderer.resize(20, 5);
+        assert_eq!(renderer.width(), 20);
+        assert_eq!(renderer.height(), 5);
+        assert_eq!(renderer.framebuffer().data.len(), 100);
+
+        // drawing outside the new bounds is still safely clipped
+        renderer.set_pixel(15, 7, Color::RED);
+        renderer.fill_rect(Rect::from_min_size(Vec2::new(0.0, 0.0), Vec2::new(50.0, 50.0)), Color::RED);
     }
 }

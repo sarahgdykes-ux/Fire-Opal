@@ -44,6 +44,20 @@ impl PlatformerGame {
 }
 
 impl Game for PlatformerGame {
+    fn fixed_update(&mut self, _engine: &mut Engine, dt: f32) {
+        let gravity = 800.0;
+
+        self.player_velocity.1 += gravity * dt;
+        self.player_pos.0 += self.player_velocity.0 * dt;
+        self.player_pos.1 += self.player_velocity.1 * dt;
+
+        // Simple floor collision
+        if self.player_pos.1 > 550.0 {
+            self.player_pos.1 = 550.0;
+            self.player_velocity.1 = 0.0;
+        }
+    }
+
     fn update(&mut self, engine: &mut Engine) {
         // Setup UI on first frame
         if self.jump_button_id.is_none() {
@@ -52,11 +66,9 @@ impl Game for PlatformerGame {
 
         let keyboard = engine.keyboard();
         let input_map = engine.input_map();
-        let delta = engine.delta_time();
 
         let move_speed = 200.0;
         let jump_force = -400.0;
-        let gravity = 800.0;
 
         // Keyboard movement
         if input_map.is_action_pressed(InputAction::MoveLeft, keyboard, engine.mouse()) {
@@ -81,16 +93,6 @@ impl Game for PlatformerGame {
                     label.set_text(format!("Score: {}", self.score));
                 }
             }
-        }
-
-        self.player_velocity.1 += gravity * delta;
-        self.player_pos.0 += self.player_velocity.0 * delta;
-        self.player_pos.1 += self.player_velocity.1 * delta;
-
-        // Simple floor collision
-        if self.player_pos.1 > 550.0 {
-            self.player_pos.1 = 550.0;
-            self.player_velocity.1 = 0.0;
         }
 
         // Camera follow

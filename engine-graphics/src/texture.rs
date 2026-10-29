@@ -50,6 +50,36 @@ impl Texture {
         self.get_pixel(x, y).unwrap_or(Color::TRANSPARENT)
     }
 
+    /// Copies this texture into a packed `0xAARRGGBB` pixel buffer (e.g. a
+    /// softbuffer surface) of size `dst_width` x `dst_height`.
+    ///
+    /// Only the overlapping region is copied, so a size mismatch (for example
+    /// during a window resize) can never write out of bounds. Any destination
+    /// pixels outside the texture are set to 0 (black).
+    pub fn blit_to_u32(&self, dst: &mut [u32], dst_width: u32, dst_height: u32) {
+        let dst_w = dst_width as usize;
+        let dst_h = dst_height as usize;
+        let src_w = self.width as usize;
+        let copy_w = dst_w.min(src_w);
+        let copy_h = dst_h.min(self.height as usize);
+
+        for y in 0..dst_h {
+            let row_start = y * dst_w;
+            let Some(row) = dst.get_mut(row_start..row_start + dst_w) else {
+                break;
+            };
+            if y < copy_h {
+                let src_row = &self.data[y * src_w..y * src_w + copy_w];
+                for (d, s) in row[..copy_w].iter_mut().zip(src_row) {
+                    *d = s.to_u32();
+                }
+                row[copy_w..].fill(0);
+            } else {
+                row.fill(0);
+            }
+        }
+    }
+
     pub fn clear(&mut self, color: Color) {
         for pixel in &mut self.data {
             *pixel = color;
@@ -142,5 +172,38 @@ mod tests {
 
         let sampled = texture.sample(0.5, 0.5);
         assert_eq!(sampled, Color::GREEN);
+    }
+
+    #[test]
+    fn test_blit_to_u32_packs_argb() {
+        let mut tex = Texture::new(2, 1);
+        tex.set_pixel(0, 0, Color::RED);
+        tex.set_pixel(1, 0, Color::BLUE);
+        let mut dst = [0u32; 2];
+        tex.blit_to_u32(&mut dst, 2, 1);
+        assert_eq!(dst[0] & 0x00FF_FFFF, 0x00FF_0000);
+        assert_eq!(dst[1] & 0x00FF_FFFF, 0x0000_00FF);
+    }
+
+    #[test]
+    fn test_blit_to_u32_handles_size_mismatch() {
+        let mut tex = Texture::new(4, 4);
+        tex.clear(Color::WHITE);
+
+        // destination larger than the texture: extra area is black
+        let mut big = vec![0xDEAD_BEEFu32; 6 * 5];
+        tex.blit_to_u32(&mut big, 6, 5);
+        assert_eq!(big[0] & 0x00FF_FFFF, 0x00FF_FFFF);
+        assert_eq!(big[5], 0); // x=5 is outside the texture
+        assert_eq!(big[4 * 6], 0); // y=4 is outside the texture
+
+        // destination smaller than the texture: no panic, no overrun
+        let mut small = vec![0u32; 2 * 3];
+        tex.blit_to_u32(&mut small, 2, 3);
+        assert!(small.iter().all(|p| p & 0x00FF_FFFF == 0x00FF_FFFF));
+
+        // destination slice shorter than claimed: must not panic
+        let mut short = vec![0u32; 3];
+        tex.blit_to_u32(&mut short, 4, 4);
     }
 }
